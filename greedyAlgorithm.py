@@ -21,6 +21,7 @@ class GreedyAlgorithm:
         return max(self.procTimeArr)
 
     def draw(self):
+        self.procTimeArr = [0] * self.procNumber
         solution = plt.figure()
         ax = solution.add_subplot(111)
 
@@ -34,7 +35,7 @@ class GreedyAlgorithm:
             self.procTimeArr[index] += task
 
         solution_time = max(self.procTimeArr)
-        print("Time: {}".format(solution_time))
+        #print("Time: {}".format(solution_time))
 
         plt.title("Solution")
         plt.xticks([i for i in range(solution_time + 1)])
