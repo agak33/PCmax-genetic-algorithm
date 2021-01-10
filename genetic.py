@@ -9,30 +9,29 @@ from math import inf
 class Genetic:
     def __init__(self,
                  populationSize: int,
+                 parentsNumber: int,
                  fileName: str):
 
-        self.fileName:       str = fileName
+        self.fileName: str = fileName
 
-        self.procNumber:     int = 0
-        self.taskNumber:     int = 0
-        self.optimum:        int = 0
-        self.populationSize: int = populationSize
-        self.parentsNumber:  int = ceil(self.populationSize / 3)
+        self.procNumber    : int = 0
+        self.taskNumber    : int = 0
+        self.optimumValue  : int = 0
+        self.parentsNumber : int = parentsNumber  if parentsNumber  >= 2 else 2
+        self.populationSize: int = populationSize if populationSize >= 3 else 3
 
-        self.procTimeArr:    list = []
-        self.population:     list = []
-        self.bestVector:     list = []
-        self.parents:        list = []
+        self.procTimeArr: list = []
+        self.population : list = []
+        self.bestVector : list = []
+        self.parents    : list = []
 
-        self.bestTime:       float = inf
-        self.startTime:      float = 0
-        self.currentTime:    float = 0
-        self.stopTime:       float = 20
+        self.bestTime   : float = inf
+        self.startTime  : float = 0
+        self.currentTime: float = 0
+        self.stopTime   : float = 120
 
-        self.populationTime: dict = {}
-        self.setOfValues:    dict = {}
-
-        self.greedy:         object = GreedyAlgorithm(0, [])
+        self.populationTime : dict = {}  # key = index in self.population list, value = time for greedy algorithm
+        self.setOfValues    : dict = {}  # key = task time, value = number of such times in a vector
 
         self.populationZero()
         self.loop()
@@ -51,70 +50,61 @@ class Genetic:
                 tempTaskTimeArr[i] = int(file.readline())
             file.close()
         except:
-            print("File error")
+            print("File error: cannot open/read")
             exit(0)
 
-        self.optimum = ceil(sum(tempTaskTimeArr) / self.procNumber)
-        tempTimeSet = set(tempTaskTimeArr)
-        for taskTime in tempTimeSet:
+        opt = ceil(sum(tempTaskTimeArr) / self.procNumber)
+        self.optimumValue = opt if opt >= max(tempTaskTimeArr) else max(tempTaskTimeArr)
+        print("Calculated optimum value:", self.optimumValue)
+
+        tempTaskTimeSet = set(tempTaskTimeArr)
+        for taskTime in tempTaskTimeSet:
             self.setOfValues[taskTime] = tempTaskTimeArr.count(taskTime)
 
+        self.population = [sorted(tempTaskTimeArr, reverse=True), tempTaskTimeArr]
         while len(self.population) < self.populationSize:
             newChromosome = sample(tempTaskTimeArr, self.taskNumber)
             if newChromosome not in self.population:
                 self.population.append(newChromosome)
 
-    def loop(self):
-        self.startTime = time()
-        while True:
-            self.fitness()
-            self.newPopulation()
-            if time() - self.startTime >= self.stopTime:
-                print("Czas dla algorytmu genetycznego: ", self.bestTime)
-                #GreedyAlgorithm(self.procNumber, self.bestVector).draw()
-                exit(0)
+    def crossover(self):
+        index1: int = 0
+        index2: int = 0
+        while index1 == index2:
+            index1 = randint(0, self.parentsNumber - 1)
+            index2 = randint(0, self.parentsNumber - 1)
+        return self.parents[index1][:int(self.taskNumber / 2) ] + \
+               self.parents[index2][ int(self.taskNumber / 2):]
+
+    def newChromosome(self):
+        tempChild = self.crossover()
+        tempSet = self.setOfValues.copy()
+        missingValues: list = []
+        for timeIndex in range(len(tempChild)):
+            if tempSet[tempChild[timeIndex]] > 0:
+                tempSet[tempChild[timeIndex]] -= 1
+            else:
+                missingValues.append(timeIndex)
+        timeIndex = 0
+        for key, val in tempSet.items():
+            while val > 0:
+                tempChild[missingValues[timeIndex]] = key
+                val -= 1
+                timeIndex += 1
+        return tempChild
 
     def newPopulation(self):
-        # sort slownika z czasami dla poszczegolnych wektorow, gdzie
-        # klucz = index w self.population, wartosc = czas dla zachlannego
         tempPopulationTime = sorted(self.populationTime.items(), key=lambda item: item[1])
-
-        for vectorIndex in range(self.parentsNumber):                             # dodanie odpowiedniej ilosci rodzicow
+        for vectorIndex in range(self.parentsNumber):
             self.parents.append(self.population[tempPopulationTime[vectorIndex][0]])
 
         self.population = [self.parents[0], self.parents[1]]
-        while len(self.population) < self.populationSize:               # tworzenie nowej
-            tempSet = self.setOfValues.copy()
-            index1: int = 0
-            index2: int = 0
-            while index1 == index2:                                     # losowanie 2 wektorow rodzicow
-                index1 = randint(0, self.parentsNumber - 1)
-                index2 = randint(0, self.parentsNumber - 1)
-            tempChild = self.parents[index1][:int(self.taskNumber / 2)] + \
-                        self.parents[index2][int(self.taskNumber / 2):]         # stworzenie potomka
-
-            tempMissingValues: list = []
-            for timeIndex in range(len(tempChild)):                                     # sprawdzenie, które wartości się powtarzają
-                if tempSet[tempChild[timeIndex]] > 0:
-                    tempSet[tempChild[timeIndex]] -= 1
-                else:
-                    tempMissingValues.append(timeIndex)     # jezeli w setcie = 0, wartośc na i-tej pozycji jest do wymiany
-
-            timeIndex = 0
-            for key, val in tempSet.items():
-                while val > 0:
-                    tempChild[tempMissingValues[timeIndex]] = key
-                    val -= 1
-                    timeIndex += 1
-
-            if randint(0, 1):                       # losujemy czy mutujemy czy nie
-                tempChild = self.mutation(tempChild)
-
-            if tempChild not in self.population:    # jak nie ma w populacji to mozna dodac
+        while len(self.population) < self.populationSize:
+            tempChild = self.newChromosome()
+            tempChild = self.mutation(tempChild) if randint(0, 1) else tempChild
+            if tempChild not in self.population:
                 self.population.append(tempChild)
-
-        self.parents.clear()
-        self.populationTime.clear()
+        self.clearArrays()
 
     def mutation(self, chromosome: list):
         index1: int = 0
@@ -125,15 +115,21 @@ class Genetic:
         chromosome[index1], chromosome[index2] = chromosome[index2], chromosome[index1]
         return chromosome
 
+    def clearArrays(self):
+        self.parents.clear()
+        self.populationTime.clear()
+
     def fitness(self):
         for chromosome in self.population:
-            self.greedy = GreedyAlgorithm(self.procNumber, chromosome)
-            resultTime = self.greedy.time()
+            resultTime = GreedyAlgorithm(self.procNumber, chromosome).time()
             self.populationTime[self.population.index(chromosome)] = resultTime
             if resultTime < self.bestTime:
                 self.bestTime = resultTime
                 self.bestVector = chromosome
-            if resultTime <= self.optimum or resultTime == max(chromosome):
-                print("algorytmem genetycznym:", resultTime)
-                #self.greedy.draw()
-                exit(0)
+
+    def loop(self):
+        self.startTime = time()
+        while time() - self.startTime < self.stopTime and self.bestTime > self.optimumValue:
+            self.fitness()
+            self.newPopulation()
+        print("Time for the genetic algorithm:", self.bestTime)

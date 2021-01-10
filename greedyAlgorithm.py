@@ -35,9 +35,8 @@ class GreedyAlgorithm:
             self.procTimeArr[index] += task
 
         solution_time = max(self.procTimeArr)
-        #print("Time: {}".format(solution_time))
 
-        plt.title("Solution")
+        plt.title("Genetic algorithm: solution")
         plt.xticks([i for i in range(solution_time + 1)])
         plt.xlabel("Time")
         plt.yticks([i for i in range(self.procNumber + 1)])
